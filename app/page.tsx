@@ -306,6 +306,74 @@ export default function Portfolio() {
       liveUrl: "https://lofiradio.in",
       repoUrl: "https://github.com/iamarpitsharma",
     },
+    {
+      name: "Amrawati Computer Center",
+      domain: "amrawaticomputer.org",
+      tagline: "Full-stack digital service hub, training portal & admin ecosystem",
+      accent: "bg-[#a684ff]",
+      stats: "Full Ecosystem & Admin Panel",
+      description:
+        "Comprehensive digital transformation portal for an established training center and service hub, featuring a modular Next.js frontend, secure TypeScript backend, and a dynamic role-based admin dashboard.",
+      highlights: [
+        "Engineered a unified platform combining student course management, a live product catalog with shelf locators, and a government notifications bulletin board.",
+        "Built a modular TypeScript/Express backend with abstract controllers, JWT authentication, and secure file uploads.",
+        "Designed a high-performance administrative control center with dynamic form generators and automated table views.",
+      ],
+      stack: ["Next.js", "React", "TypeScript", "Node.js", "Express.js", "MongoDB", "Tailwind CSS"],
+      liveUrl: "https://www.amrawaticomputer.org",
+      repoUrl: "https://github.com/iamarpitsharma",
+    },
+    {
+      name: "Success Library",
+      domain: "successlibrary.in",
+      tagline: "Smart study facility & concurrent seat management system",
+      accent: "bg-[#38BDF8]",
+      stats: "Real-Time Seat Allocation",
+      description:
+        "End-to-end digital management system for a premium study library, equipped with real-time seat tracking, automated membership lifecycle updates, and an admin dashboard.",
+      highlights: [
+        "Developed concurrent seat allocation workflows allowing administrators to seamlessly assign, swap, and release study slots.",
+        "Built automated subscription tracking and student record management to minimize administrative friction.",
+        "Integrated a clean, responsive student-facing portal highlighting facility amenities, shift timings, and seat availability.",
+      ],
+      stack: ["Next.js", "Node.js", "Express.js", "MongoDB", "Tailwind CSS", "TypeScript"],
+      liveUrl: "https://success-library-homepage.vercel.app",
+      repoUrl: "https://github.com/iamarpitsharma",
+    },
+    {
+      name: "Hello Her",
+      domain: "helloher.in",
+      tagline: "Real-time communication, voice calling & live events platform",
+      accent: "bg-[#EC4899]",
+      stats: "Low-Latency WebRTC & Socket.io",
+      description:
+        "Scalable real-time communication platform featuring Agora-powered voice calling, Socket.IO live chat channels, push notifications, and third-party OTP verification.",
+      highlights: [
+        "Architected robust backend modules using Node.js and Socket.IO for instant messaging, live event notifications, and user presence.",
+        "Integrated Agora SDK to enable high-quality, low-latency real-time voice calling.",
+        "Implemented secure authentication pipelines featuring third-party SMS APIs for instant OTP verification.",
+      ],
+      stack: ["HTML", "CSS", "JavaScript", "Node.js", "Express.js", "Socket.IO", "Agora SDK", "MongoDB", "TypeScript"],
+      liveUrl: "https://helloher.in",
+      repoUrl: "https://github.com/iamarpitsharma",
+    },
+    {
+      name: "Future Past E-Commerce",
+      domain: "futurepast.in",
+      tagline: "Transactional order management & logistics workflow",
+      accent: "bg-[#F97316]",
+      stats: "Razorpay & Shiprocket Integration",
+      description:
+        "Full-stack e-commerce platform and backend engine supporting product reselling, secure payment verification, and automated shipping synchronization.",
+      highlights: [
+        "Integrated Razorpay payment gateways to coordinate secure transaction processing and order creation workflows.",
+        "Automated fulfillment pipelines via Shiprocket REST APIs for live tracking and delivery-status updates.",
+        "Engineered secure admin panel backends for inventory control, order auditing, and status lifecycle management.",
+      ],
+      stack: ["Node.js", "Express.js", "MongoDB", "Razorpay API", "Shiprocket API", "TypeScript", "Tailwind CSS", "Next.js"],
+      liveUrl: "https://futurepast.in",
+      repoUrl: "https://github.com/iamarpitsharma",
+    },
   ];
 
   return (
@@ -358,55 +426,50 @@ export default function Portfolio() {
             <a
               href="#hero"
               onClick={(e) => handleSmoothScroll(e, "hero")}
-              className={`flex items-center gap-3 p-3 font-mono font-bold text-sm border-[2px] border-black dark:border-zinc-700 shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] cursor-pointer transition-colors ${
-                activeSection === "hero"
-                  ? "bg-[#FFD23F] text-black"
-                  : "bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100"
-              }`}
+              className={`flex items-center gap-3 p-3 font-mono font-bold text-sm border-[2px] border-black dark:border-zinc-700 shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] cursor-pointer transition-colors ${activeSection === "hero"
+                ? "bg-[#FFD23F] text-black"
+                : "bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100"
+                }`}
             >
               <Terminal className="w-4 h-4 text-black dark:text-[#FFD23F]" /> Command Center
             </a>
             <a
               href="#tech-stack"
               onClick={(e) => handleSmoothScroll(e, "tech-stack")}
-              className={`flex items-center gap-3 p-3 font-mono font-bold text-sm border-[2px] border-black dark:border-zinc-700 shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] cursor-pointer transition-colors ${
-                activeSection === "tech-stack"
-                  ? "bg-[#A3E635] text-black"
-                  : "bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100"
-              }`}
+              className={`flex items-center gap-3 p-3 font-mono font-bold text-sm border-[2px] border-black dark:border-zinc-700 shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] cursor-pointer transition-colors ${activeSection === "tech-stack"
+                ? "bg-[#A3E635] text-black"
+                : "bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100"
+                }`}
             >
               <Cpu className="w-4 h-4 text-black dark:text-[#A3E635]" /> Tech Stack & Capabilities
             </a>
             <a
               href="#experience"
               onClick={(e) => handleSmoothScroll(e, "experience")}
-              className={`flex items-center gap-3 p-3 font-mono font-bold text-sm border-[2px] border-black dark:border-zinc-700 shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] cursor-pointer transition-colors ${
-                activeSection === "experience"
-                  ? "bg-[#38BDF8] text-black"
-                  : "bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100"
-              }`}
+              className={`flex items-center gap-3 p-3 font-mono font-bold text-sm border-[2px] border-black dark:border-zinc-700 shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] cursor-pointer transition-colors ${activeSection === "experience"
+                ? "bg-[#38BDF8] text-black"
+                : "bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100"
+                }`}
             >
               <Briefcase className="w-4 h-4 text-black dark:text-[#38BDF8]" /> Work Experience
             </a>
             <a
               href="#projects"
               onClick={(e) => handleSmoothScroll(e, "projects")}
-              className={`flex items-center gap-3 p-3 font-mono font-bold text-sm border-[2px] border-black dark:border-zinc-700 shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] cursor-pointer transition-colors ${
-                activeSection === "projects"
-                  ? "bg-[#FF6B6B] text-black"
-                  : "bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100"
-              }`}
+              className={`flex items-center gap-3 p-3 font-mono font-bold text-sm border-[2px] border-black dark:border-zinc-700 shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] cursor-pointer transition-colors ${activeSection === "projects"
+                ? "bg-[#FF6B6B] text-black"
+                : "bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100"
+                }`}
             >
               <FolderGit2 className="w-4 h-4 text-black dark:text-[#FF6B6B]" /> Featured Projects
             </a>
             <a
               href="#contact"
               onClick={(e) => handleSmoothScroll(e, "contact")}
-              className={`flex items-center gap-3 p-3 font-mono font-bold text-sm border-[2px] border-black dark:border-zinc-700 shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] cursor-pointer transition-colors ${
-                activeSection === "contact"
-                  ? "bg-[#C084FC] text-black"
-                  : "bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100"
-              }`}
+              className={`flex items-center gap-3 p-3 font-mono font-bold text-sm border-[2px] border-black dark:border-zinc-700 shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] cursor-pointer transition-colors ${activeSection === "contact"
+                ? "bg-[#C084FC] text-black"
+                : "bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100"
+                }`}
             >
               <Mail className="w-4 h-4 text-black dark:text-[#C084FC]" /> Contact Me
             </a>
@@ -454,55 +517,50 @@ export default function Portfolio() {
               <a
                 href="#hero"
                 onClick={(e) => handleSmoothScroll(e, "hero")}
-                className={`flex items-center gap-3 px-3 py-2 text-sm font-mono font-bold transition-all cursor-pointer ${
-                  activeSection === "hero"
-                    ? "bg-[#FFD23F] text-black border-[2px] border-black shadow-[3px_3px_0_0_#000] translate-x-1"
-                    : "hover:bg-[#FFD23F] hover:text-black border-[2px] border-transparent hover:border-black text-black dark:text-zinc-200"
-                }`}
+                className={`flex items-center gap-3 px-3 py-2 text-sm font-mono font-bold transition-all cursor-pointer ${activeSection === "hero"
+                  ? "bg-[#FFD23F] text-black border-[2px] border-black shadow-[3px_3px_0_0_#000] translate-x-1"
+                  : "hover:bg-[#FFD23F] hover:text-black border-[2px] border-transparent hover:border-black text-black dark:text-zinc-200"
+                  }`}
               >
                 <Terminal className="w-4 h-4" /> Command Center
               </a>
               <a
                 href="#tech-stack"
                 onClick={(e) => handleSmoothScroll(e, "tech-stack")}
-                className={`flex items-center gap-3 px-3 py-2 text-sm font-mono font-bold transition-all cursor-pointer ${
-                  activeSection === "tech-stack"
-                    ? "bg-[#A3E635] text-black border-[2px] border-black shadow-[3px_3px_0_0_#000] translate-x-1"
-                    : "hover:bg-[#A3E635] hover:text-black border-[2px] border-transparent hover:border-black text-black dark:text-zinc-200"
-                }`}
+                className={`flex items-center gap-3 px-3 py-2 text-sm font-mono font-bold transition-all cursor-pointer ${activeSection === "tech-stack"
+                  ? "bg-[#A3E635] text-black border-[2px] border-black shadow-[3px_3px_0_0_#000] translate-x-1"
+                  : "hover:bg-[#A3E635] hover:text-black border-[2px] border-transparent hover:border-black text-black dark:text-zinc-200"
+                  }`}
               >
                 <Cpu className="w-4 h-4" /> Tech Stack
               </a>
               <a
                 href="#experience"
                 onClick={(e) => handleSmoothScroll(e, "experience")}
-                className={`flex items-center gap-3 px-3 py-2 text-sm font-mono font-bold transition-all cursor-pointer ${
-                  activeSection === "experience"
-                    ? "bg-[#38BDF8] text-black border-[2px] border-black shadow-[3px_3px_0_0_#000] translate-x-1"
-                    : "hover:bg-[#38BDF8] hover:text-black border-[2px] border-transparent hover:border-black text-black dark:text-zinc-200"
-                }`}
+                className={`flex items-center gap-3 px-3 py-2 text-sm font-mono font-bold transition-all cursor-pointer ${activeSection === "experience"
+                  ? "bg-[#38BDF8] text-black border-[2px] border-black shadow-[3px_3px_0_0_#000] translate-x-1"
+                  : "hover:bg-[#38BDF8] hover:text-black border-[2px] border-transparent hover:border-black text-black dark:text-zinc-200"
+                  }`}
               >
                 <Briefcase className="w-4 h-4" /> Work Experience
               </a>
               <a
                 href="#projects"
                 onClick={(e) => handleSmoothScroll(e, "projects")}
-                className={`flex items-center gap-3 px-3 py-2 text-sm font-mono font-bold transition-all cursor-pointer ${
-                  activeSection === "projects"
-                    ? "bg-[#FF6B6B] text-black border-[2px] border-black shadow-[3px_3px_0_0_#000] translate-x-1"
-                    : "hover:bg-[#FF6B6B] hover:text-black border-[2px] border-transparent hover:border-black text-black dark:text-zinc-200"
-                }`}
+                className={`flex items-center gap-3 px-3 py-2 text-sm font-mono font-bold transition-all cursor-pointer ${activeSection === "projects"
+                  ? "bg-[#FF6B6B] text-black border-[2px] border-black shadow-[3px_3px_0_0_#000] translate-x-1"
+                  : "hover:bg-[#FF6B6B] hover:text-black border-[2px] border-transparent hover:border-black text-black dark:text-zinc-200"
+                  }`}
               >
                 <FolderGit2 className="w-4 h-4" /> Projects
               </a>
               <a
                 href="#contact"
                 onClick={(e) => handleSmoothScroll(e, "contact")}
-                className={`flex items-center gap-3 px-3 py-2 text-sm font-mono font-bold transition-all cursor-pointer ${
-                  activeSection === "contact"
-                    ? "bg-[#C084FC] text-black border-[2px] border-black shadow-[3px_3px_0_0_#000] translate-x-1"
-                    : "hover:bg-[#C084FC] hover:text-black border-[2px] border-transparent hover:border-black text-black dark:text-zinc-200"
-                }`}
+                className={`flex items-center gap-3 px-3 py-2 text-sm font-mono font-bold transition-all cursor-pointer ${activeSection === "contact"
+                  ? "bg-[#C084FC] text-black border-[2px] border-black shadow-[3px_3px_0_0_#000] translate-x-1"
+                  : "hover:bg-[#C084FC] hover:text-black border-[2px] border-transparent hover:border-black text-black dark:text-zinc-200"
+                  }`}
               >
                 <Mail className="w-4 h-4" /> Contact Me
               </a>
