@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import {
   Terminal,
@@ -34,6 +34,8 @@ import {
   ArrowUp,
   AlertCircle,
   Loader2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import emailjs from "@emailjs/browser";
 import InfiniteMarquee from "./components/InfiniteMarquee";
@@ -52,6 +54,27 @@ export default function Portfolio() {
     subject: "",
     message: "",
   });
+  const [expandedCategories, setExpandedCategories] = useState<number[]>([]);
+  const headerRef = useRef<HTMLElement>(null);
+
+  // Close mobile navigation menu on click outside
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      if (headerRef.current && !headerRef.current.contains(event.target as Node)) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [mobileMenuOpen]);
 
   // Track scroll position to update active section in navigation & show back-to-top button
   useEffect(() => {
@@ -91,7 +114,33 @@ export default function Portfolio() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Sync theme with HTML class
+  // Initialize theme based on saved user preference or system preference (fallback: light)
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
+    if (savedTheme) {
+      setTheme(savedTheme);
+      return;
+    }
+
+    if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      setTheme("dark");
+    } else {
+      setTheme("light");
+    }
+
+    // Listen for system theme changes if user hasn't explicitly set a preference
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (!localStorage.getItem("theme")) {
+        setTheme(e.matches ? "dark" : "light");
+      }
+    };
+
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, []);
+
+  // Sync theme with HTML class & localStorage
   useEffect(() => {
     const root = document.documentElement;
     if (theme === "dark") {
@@ -104,7 +153,11 @@ export default function Portfolio() {
   }, [theme]);
 
   const toggleTheme = () => {
-    setTheme((prev) => (prev === "light" ? "dark" : "light"));
+    setTheme((prev) => {
+      const nextTheme = prev === "light" ? "dark" : "light";
+      localStorage.setItem("theme", nextTheme);
+      return nextTheme;
+    });
   };
 
   const handleSmoothScroll = (
@@ -169,7 +222,8 @@ export default function Portfolio() {
           from_name: contactForm.name,
           from_email: contactForm.email,
           reply_to: contactForm.email,
-          subject: contactForm.subject || "Portfolio Inquiry (Backend Role)",
+          subject:
+            contactForm.subject || "Portfolio Inquiry (Project / Backend Opportunity)",
           message: contactForm.message,
           to_name: "Arpit Sharma",
         },
@@ -294,7 +348,7 @@ export default function Portfolio() {
       domain: "lofiradio.in",
       tagline: "Real-time sync web audio station & listener presence",
       accent: "bg-[#A3E635]",
-      stats: "1-Hour Cache & Presence",
+      stats: "1-Hour Cache",
       description:
         "Ambient live audio streaming web application integrating YouTube Iframe audio streams with server-side playlist parsing and low-latency listener rooms.",
       highlights: [
@@ -311,7 +365,7 @@ export default function Portfolio() {
       domain: "amrawaticomputer.org",
       tagline: "Full-stack digital service hub, training portal & admin ecosystem",
       accent: "bg-[#a684ff]",
-      stats: "Full Ecosystem & Admin Panel",
+      stats: "Admin Panel",
       description:
         "Comprehensive digital transformation portal for an established training center and service hub, featuring a modular Next.js frontend, secure TypeScript backend, and a dynamic role-based admin dashboard.",
       highlights: [
@@ -328,7 +382,7 @@ export default function Portfolio() {
       domain: "successlibrary.in",
       tagline: "Smart study facility & concurrent seat management system",
       accent: "bg-[#38BDF8]",
-      stats: "Real-Time Seat Allocation",
+      stats: "Concurrent Booking",
       description:
         "End-to-end digital management system for a premium study library, equipped with real-time seat tracking, automated membership lifecycle updates, and an admin dashboard.",
       highlights: [
@@ -345,7 +399,7 @@ export default function Portfolio() {
       domain: "helloher.in",
       tagline: "Real-time communication, voice calling & live events platform",
       accent: "bg-[#EC4899]",
-      stats: "Low-Latency WebRTC & Socket.io",
+      stats: "Low-Latency WebRTC",
       description:
         "Scalable real-time communication platform featuring Agora-powered voice calling, Socket.IO live chat channels, push notifications, and third-party OTP verification.",
       highlights: [
@@ -353,7 +407,7 @@ export default function Portfolio() {
         "Integrated Agora SDK to enable high-quality, low-latency real-time voice calling.",
         "Implemented secure authentication pipelines featuring third-party SMS APIs for instant OTP verification.",
       ],
-      stack: ["HTML", "CSS", "JavaScript", "Node.js", "Express.js", "Socket.IO", "Agora SDK", "MongoDB", "TypeScript"],
+      stack: ["HTML", "CSS", "JavaScript", "Node.js", "Express.js", "Socket.IO", "Agora SDK", "MongoDB", "TypeScript", "Encryption"],
       liveUrl: "https://helloher.in",
       repoUrl: "https://github.com/iamarpitsharma",
     },
@@ -362,7 +416,7 @@ export default function Portfolio() {
       domain: "futurepast.in",
       tagline: "Transactional order management & logistics workflow",
       accent: "bg-[#F97316]",
-      stats: "Razorpay & Shiprocket Integration",
+      stats: "Shiprocket Integration",
       description:
         "Full-stack e-commerce platform and backend engine supporting product reselling, secure payment verification, and automated shipping synchronization.",
       highlights: [
@@ -379,7 +433,10 @@ export default function Portfolio() {
   return (
     <div className="min-h-screen bg-[#FFFDF5] dark:bg-[#121212] text-black dark:text-zinc-100 transition-colors duration-200">
       {/* Top Command Bar & Global Header with uniform height navbar items */}
-      <header className="sticky top-0 z-50 w-full bg-[#FFFDF5] dark:bg-[#121212] border-b-[3px] border-black dark:border-zinc-700">
+      <header
+        ref={headerRef}
+        className="sticky top-0 z-50 w-full bg-[#FFFDF5] dark:bg-[#121212] border-b-[3px] border-black dark:border-zinc-700"
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between gap-4">
           {/* Logo / Brand Ident */}
           <div className="flex items-center gap-3">
@@ -431,7 +488,7 @@ export default function Portfolio() {
                 : "bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100"
                 }`}
             >
-              <Terminal className="w-4 h-4 text-black dark:text-[#FFD23F]" /> Command Center
+              <Terminal className={`w-4 h-4 ${activeSection === "hero" ? "text-black" : "text-black dark:text-[#FFD23F]"}`} /> Command Center
             </a>
             <a
               href="#tech-stack"
@@ -441,7 +498,7 @@ export default function Portfolio() {
                 : "bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100"
                 }`}
             >
-              <Cpu className="w-4 h-4 text-black dark:text-[#A3E635]" /> Tech Stack & Capabilities
+              <Cpu className={`w-4 h-4 ${activeSection === "tech-stack" ? "text-black" : "text-black dark:text-[#A3E635]"}`} /> Tech Stack & Capabilities
             </a>
             <a
               href="#experience"
@@ -451,7 +508,7 @@ export default function Portfolio() {
                 : "bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100"
                 }`}
             >
-              <Briefcase className="w-4 h-4 text-black dark:text-[#38BDF8]" /> Work Experience
+              <Briefcase className={`w-4 h-4 ${activeSection === "experience" ? "text-black" : "text-black dark:text-[#38BDF8]"}`} /> Work Experience
             </a>
             <a
               href="#projects"
@@ -461,7 +518,7 @@ export default function Portfolio() {
                 : "bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100"
                 }`}
             >
-              <FolderGit2 className="w-4 h-4 text-black dark:text-[#FF6B6B]" /> Featured Projects
+              <FolderGit2 className={`w-4 h-4 ${activeSection === "projects" ? "text-black" : "text-black dark:text-[#FF6B6B]"}`} /> Featured Projects
             </a>
             <a
               href="#contact"
@@ -471,7 +528,7 @@ export default function Portfolio() {
                 : "bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100"
                 }`}
             >
-              <Mail className="w-4 h-4 text-black dark:text-[#C084FC]" /> Contact Me
+              <Mail className={`w-4 h-4 ${activeSection === "contact" ? "text-black" : "text-black dark:text-[#C084FC]"}`} /> Contact Me
             </a>
             <div className="flex items-center gap-2 p-2.5 bg-[#A3E635] text-black font-mono font-bold text-xs border-[2px] border-black">
               <CheckCircle className="w-4 h-4" /> Available for Hire in Bengaluru
@@ -479,6 +536,15 @@ export default function Portfolio() {
           </div>
         )}
       </header>
+
+      {/* Backdrop overlay on mobile: closes navbar on tap outside */}
+      {mobileMenuOpen && (
+        <div
+          onClick={() => setMobileMenuOpen(false)}
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] md:hidden"
+          aria-hidden="true"
+        />
+      )}
 
       {/* Main Layout Container (Sidebar + Content Grid) */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row gap-8">
@@ -613,15 +679,16 @@ export default function Portfolio() {
           <section id="hero" className="w-full scroll-mt-24">
             <div className="bg-white dark:bg-[#1A1A1A] border-[3px] border-black dark:border-zinc-700 shadow-[8px_8px_0_0_#000] dark:shadow-[8px_8px_0_0_#3F3F46] p-6 sm:p-8">
               {/* Terminal Title Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-2 pb-4 mb-6 border-b-[3px] border-black dark:border-zinc-700">
-                <div className="flex items-center gap-2 font-mono text-xs font-bold">
-                  <div className="w-3 h-3 bg-[#FF6B6B] border-[2px] border-black dark:border-zinc-700" />
-                  <div className="w-3 h-3 bg-[#FFD23F] border-[2px] border-black dark:border-zinc-700" />
-                  <div className="w-3 h-3 bg-[#A3E635] border-[2px] border-black dark:border-zinc-700" />
-                  <span className="ml-2">DEV://BENGALURU/ARPIT_SHARMA.EXE</span>
+              <div className="flex items-center justify-between gap-2 pb-4 mb-6 border-b-[3px] border-black dark:border-zinc-700">
+                <div className="flex items-center gap-1.5 sm:gap-2 font-mono text-xs font-bold truncate">
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-[#FF6B6B] border-[2px] border-black dark:border-zinc-700 shrink-0" />
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-[#FFD23F] border-[2px] border-black dark:border-zinc-700 shrink-0" />
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-[#A3E635] border-[2px] border-black dark:border-zinc-700 shrink-0" />
+                  <span className="ml-1 sm:ml-2 block sm:hidden truncate">DEV://ARPIT_SHARMA.EXE</span>
+                  <span className="ml-1 sm:ml-2 hidden sm:block truncate">DEV://BENGALURU/ARPIT_SHARMA.EXE</span>
                 </div>
-                <div className="flex items-center gap-2 font-mono text-xs bg-[#A3E635] text-black px-2.5 py-1 border-[2px] border-black font-bold">
-                  <CheckCircle className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-1.5 sm:gap-2 font-mono text-[10px] sm:text-xs bg-[#A3E635] text-black px-2 sm:px-2.5 py-1 border-[2px] border-black font-bold shrink-0">
+                  <CheckCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   <span>ONLINE & AVAILABLE</span>
                 </div>
               </div>
@@ -633,7 +700,7 @@ export default function Portfolio() {
                 </div>
                 <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black font-mono tracking-tight leading-tight">
                   Arpit Sharma — <br />
-                  <span className="bg-black text-[#A3E635] dark:bg-zinc-100 dark:text-black px-2 py-0.5 inline-block mt-1">
+                  <span className="bg-black text-[#A3E635] dark:bg-zinc-100 dark:text-black px-2 py-0.5 inline-block mt-1 whitespace-nowrap text-2xl sm:text-5xl lg:text-6xl">
                     Backend Developer
                   </span>
                 </h1>
@@ -711,50 +778,90 @@ export default function Portfolio() {
 
             {/* Categorized Visual Bento Layout */}
             <div className="flex flex-col gap-6">
-              {techCategories.map((cat, catIdx) => (
-                <div
-                  key={catIdx}
-                  className="bg-white dark:bg-[#1A1A1A] border-[3px] border-black dark:border-zinc-700 shadow-[6px_6px_0_0_#000] dark:shadow-[6px_6px_0_0_#3F3F46] p-4 sm:p-6"
-                >
-                  <div className="flex items-center justify-between pb-3.5 mb-4 border-b-[2px] border-black dark:border-zinc-700">
-                    <div className="flex items-center gap-2.5">
-                      <span className={`px-2.5 py-1 text-xs font-mono font-bold border-[2px] border-black text-black ${cat.accent}`}>
-                        {cat.badge}
-                      </span>
-                      <h3 className="font-mono font-black text-base sm:text-lg tracking-tight">
-                        {cat.title}
-                      </h3>
-                    </div>
-                    {/* Hidden on mobile, visible on sm and up */}
-                    <span className="hidden sm:inline font-mono text-xs font-bold text-zinc-500">
-                      {cat.skills.length} ITEMS
-                    </span>
-                  </div>
+              {techCategories.map((cat, catIdx) => {
+                const isExpanded = expandedCategories.includes(catIdx);
+                const toggleCategory = () => {
+                  setExpandedCategories((prev) =>
+                    prev.includes(catIdx)
+                      ? prev.filter((i) => i !== catIdx)
+                      : [...prev, catIdx]
+                  );
+                };
 
-                  {/* Enhanced responsive grid design: clean cards with consistent height and high-contrast Neo-Brutalist tags */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-3">
-                    {cat.skills.map((skill, sIdx) => {
-                      const Icon = skill.icon;
-                      return (
-                        <div
-                          key={sIdx}
-                          className="flex items-center justify-between p-3 bg-[#FFFDF5] dark:bg-[#141414] border-[2px] border-black dark:border-zinc-700 shadow-[3px_3px_0_0_#000] dark:shadow-[3px_3px_0_0_#3F3F46] hover:-translate-y-0.5 hover:translate-x-0.5 hover:shadow-[4px_4px_0_0_#000] dark:hover:shadow-[4px_4px_0_0_#3F3F46] transition-all cursor-default group"
+                return (
+                  <div
+                    key={catIdx}
+                    className="bg-white dark:bg-[#1A1A1A] border-[3px] border-black dark:border-zinc-700 shadow-[6px_6px_0_0_#000] dark:shadow-[6px_6px_0_0_#3F3F46] p-4 sm:p-6"
+                  >
+                    {/* Header: clickable button on mobile to toggle collapse, static header on desktop */}
+                    <div
+                      onClick={toggleCategory}
+                      className="flex items-center justify-between pb-3.5 border-b-[2px] border-black dark:border-zinc-700 cursor-pointer sm:cursor-default select-none"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span
+                          className={`px-3 py-1 text-xs font-mono font-bold border-[2px] border-black text-black shrink-0 whitespace-nowrap ${cat.accent}`}
                         >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="p-2 bg-white dark:bg-[#222] border-[1.5px] border-black dark:border-zinc-700 text-black dark:text-zinc-100 group-hover:bg-[#FFD23F] group-hover:text-black transition-colors shrink-0">
-                              <Icon className="w-4 h-4" />
-                            </div>
-                            <span className="font-mono text-xs sm:text-sm font-bold text-black dark:text-zinc-100 truncate tracking-tight">
-                              {skill.name}
-                            </span>
-                          </div>
-                          <span className="w-2 h-2 rounded-none bg-black dark:bg-zinc-700 group-hover:bg-[#A3E635] transition-colors shrink-0 ml-2" />
+                          {cat.badge}
+                        </span>
+                        <h3 className="font-mono font-black text-base sm:text-lg tracking-tight truncate">
+                          {cat.title}
+                        </h3>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {/* Hidden on mobile, visible on sm and up */}
+                        <span className="hidden sm:inline font-mono text-xs font-bold text-zinc-500">
+                          {cat.skills.length} ITEMS
+                        </span>
+                        {/* Mobile collapse toggle indicator */}
+                        <button
+                          type="button"
+                          aria-label={isExpanded ? "Collapse category" : "Expand category"}
+                          className="sm:hidden flex items-center gap-1 font-mono text-[11px] font-bold px-2 py-1 bg-[#FFFDF5] dark:bg-[#222] border-[1.5px] border-black dark:border-zinc-600 shadow-[1.5px_1.5px_0_0_#000] active:translate-x-0.5 active:translate-y-0.5 transition-transform"
+                        >
+                          <span>{isExpanded ? "HIDE" : "SHOW"}</span>
+                          <ChevronDown
+                            className={`w-3.5 h-3.5 transition-transform duration-300 ${isExpanded ? "rotate-180" : "rotate-0"
+                              }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Enhanced responsive grid design: animated collapse on mobile, always visible on sm+ */}
+                    <div
+                      className={`grid transition-all duration-300 ease-in-out ${isExpanded
+                        ? "grid-rows-[1fr] opacity-100"
+                        : "grid-rows-[0fr] opacity-0 sm:grid-rows-[1fr] sm:opacity-100"
+                        }`}
+                    >
+                      <div className="overflow-hidden">
+                        <div className="pt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-3">
+                          {cat.skills.map((skill, sIdx) => {
+                            const Icon = skill.icon;
+                            return (
+                              <div
+                                key={sIdx}
+                                className="flex items-center justify-between p-3 bg-[#FFFDF5] dark:bg-[#141414] border-[2px] border-black dark:border-zinc-700 shadow-[3px_3px_0_0_#000] dark:shadow-[3px_3px_0_0_#3F3F46] hover:-translate-y-0.5 hover:translate-x-0.5 hover:shadow-[4px_4px_0_0_#000] dark:hover:shadow-[4px_4px_0_0_#3F3F46] transition-all cursor-default group"
+                              >
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className="p-2 bg-white dark:bg-[#222] border-[1.5px] border-black dark:border-zinc-700 text-black dark:text-zinc-100 group-hover:bg-[#FFD23F] group-hover:text-black transition-colors shrink-0">
+                                    <Icon className="w-4 h-4" />
+                                  </div>
+                                  <span className="font-mono text-xs sm:text-sm font-bold text-black dark:text-zinc-100 truncate tracking-tight">
+                                    {skill.name}
+                                  </span>
+                                </div>
+                                <span className="w-2 h-2 rounded-none bg-black dark:bg-zinc-700 group-hover:bg-[#A3E635] transition-colors shrink-0 ml-2" />
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
 
@@ -919,7 +1026,8 @@ export default function Portfolio() {
                         rel="noopener noreferrer"
                         className="flex-1 py-2.5 px-4 bg-[#FFD23F] text-black font-mono font-bold text-xs text-center border-[2px] border-black shadow-[3px_3px_0_0_#000] hover:translate-x-0.5 hover:translate-y-0.5 transition-transform flex items-center justify-center gap-2 cursor-pointer"
                       >
-                        <ExternalLink className="w-3.5 h-3.5" /> Visit Live ({proj.domain})
+                        <ExternalLink className="w-3.5 h-3.5" /> Visit Live
+                        {/* ({proj.domain}) */}
                       </a>
                       <a
                         href={proj.repoUrl}
@@ -1073,7 +1181,7 @@ export default function Portfolio() {
                           onChange={(e) =>
                             setContactForm({ ...contactForm, name: e.target.value })
                           }
-                          placeholder="Linus Torvalds"
+                          placeholder="Arpit Sharma"
                           disabled={contactSending}
                           className="w-full px-3 py-2 text-xs font-mono bg-white dark:bg-[#1A1A1A] text-black dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 border-[2px] border-black dark:border-zinc-700 rounded-none shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] focus:outline-none focus:bg-[#FFD23F] focus:text-black focus:placeholder:text-zinc-700 disabled:opacity-60"
                         />
@@ -1089,7 +1197,7 @@ export default function Portfolio() {
                           onChange={(e) =>
                             setContactForm({ ...contactForm, email: e.target.value })
                           }
-                          placeholder="recruiter@tech.co"
+                          placeholder="arpit@tech.co"
                           disabled={contactSending}
                           className="w-full px-3 py-2 text-xs font-mono bg-white dark:bg-[#1A1A1A] text-black dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 border-[2px] border-black dark:border-zinc-700 rounded-none shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] focus:outline-none focus:bg-[#FFD23F] focus:text-black focus:placeholder:text-zinc-700 disabled:opacity-60"
                         />
@@ -1098,7 +1206,7 @@ export default function Portfolio() {
 
                     <div>
                       <label className="block font-mono text-xs font-bold uppercase mb-1">
-                        Subject / Opportunity
+                        Subject / Project / Opportunity
                       </label>
                       <input
                         type="text"
@@ -1106,7 +1214,7 @@ export default function Portfolio() {
                         onChange={(e) =>
                           setContactForm({ ...contactForm, subject: e.target.value })
                         }
-                        placeholder="Backend Developer Opportunity (Node.js/Express)"
+                        placeholder="Need backend developer for custom SaaS / Backend Role"
                         disabled={contactSending}
                         className="w-full px-3 py-2 text-xs font-mono bg-white dark:bg-[#1A1A1A] text-black dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 border-[2px] border-black dark:border-zinc-700 rounded-none shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] focus:outline-none focus:bg-[#FFD23F] focus:text-black focus:placeholder:text-zinc-700 disabled:opacity-60"
                       />
@@ -1123,7 +1231,7 @@ export default function Portfolio() {
                         onChange={(e) =>
                           setContactForm({ ...contactForm, message: e.target.value })
                         }
-                        placeholder="Hello Arpit, we'd like to interview you for a Backend role..."
+                        placeholder="Hey Arpit, we want to build a high-performance backend / discuss a project or role..."
                         disabled={contactSending}
                         className="w-full px-3 py-2 text-xs font-mono bg-white dark:bg-[#1A1A1A] text-black dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 border-[2px] border-black dark:border-zinc-700 rounded-none shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] focus:outline-none focus:bg-[#FFD23F] focus:text-black focus:placeholder:text-zinc-700 disabled:opacity-60"
                       />
