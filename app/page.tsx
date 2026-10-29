@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useSyncExternalStore } from "react";
 import Image from "next/image";
 import {
   Terminal,
@@ -30,18 +30,40 @@ import {
   Clock,
   KeyRound,
   Phone,
-  Asterisk,
   ArrowUp,
   AlertCircle,
   Loader2,
   ChevronDown,
-  ChevronUp,
 } from "lucide-react";
 import emailjs from "@emailjs/browser";
+import { useLenis } from "lenis/react";
 import InfiniteMarquee from "./components/InfiniteMarquee";
 
+function subscribeTheme(callback: () => void) {
+  const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  mediaQuery.addEventListener("change", callback);
+  window.addEventListener("storage", callback);
+  window.addEventListener("theme-change", callback);
+  return () => {
+    mediaQuery.removeEventListener("change", callback);
+    window.removeEventListener("storage", callback);
+    window.removeEventListener("theme-change", callback);
+  };
+}
+
+function getThemeSnapshot(): "light" | "dark" {
+  const saved = localStorage.getItem("theme");
+  if (saved === "light" || saved === "dark") return saved;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function getServerSnapshot(): "light" | "dark" {
+  return "light";
+}
+
 export default function Portfolio() {
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const lenis = useLenis();
+  const theme = useSyncExternalStore(subscribeTheme, getThemeSnapshot, getServerSnapshot);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<string>("hero");
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -56,6 +78,7 @@ export default function Portfolio() {
   });
   const [expandedCategories, setExpandedCategories] = useState<number[]>([]);
   const headerRef = useRef<HTMLElement>(null);
+  const isInitialMount = useRef(true);
 
   // Close mobile navigation menu on click outside
   useEffect(() => {
@@ -76,37 +99,45 @@ export default function Portfolio() {
     };
   }, [mobileMenuOpen]);
 
-  // Track scroll position to update active section in navigation & show back-to-top button
+  // Track scroll position using requestAnimationFrame to update active section & back-to-top button without layout thrashing
   useEffect(() => {
-    const handleScroll = () => {
-      const scrollPosition = window.scrollY + 140;
+    let ticking = false;
+
+    const updateScroll = () => {
+      const scrollY = window.scrollY;
       const windowHeight = window.innerHeight;
       const fullHeight = document.documentElement.scrollHeight;
 
-      // Reveal back to top near bottom
-      const scrolledToBottom = windowHeight + window.scrollY >= fullHeight - 600;
-      setShowScrollTop(scrolledToBottom || window.scrollY > 1000);
+      const scrolledToBottom = windowHeight + scrollY >= fullHeight - 600;
+      const shouldShowTop = scrolledToBottom || scrollY > 1000;
+      setShowScrollTop((prev) => (prev !== shouldShowTop ? shouldShowTop : prev));
 
-      // If at or near very bottom of page, highlight contact
-      if (windowHeight + window.scrollY >= fullHeight - 150) {
-        setActiveSection("contact");
+      if (windowHeight + scrollY >= fullHeight - 150) {
+        setActiveSection((prev) => (prev !== "contact" ? "contact" : prev));
+        ticking = false;
         return;
       }
 
-      // Check section offsets
+      const scrollPosition = scrollY + 140;
       const sections = ["contact", "projects", "experience", "tech-stack", "hero"];
       for (const sectionId of sections) {
         const el = document.getElementById(sectionId);
-        if (el) {
-          const top = el.offsetTop;
-          if (scrollPosition >= top) {
-            setActiveSection(sectionId);
-            return;
-          }
+        if (el && scrollPosition >= el.offsetTop) {
+          setActiveSection((prev) => (prev !== sectionId ? sectionId : prev));
+          ticking = false;
+          return;
         }
       }
 
-      setActiveSection("hero");
+      setActiveSection((prev) => (prev !== "hero" ? "hero" : prev));
+      ticking = false;
+    };
+
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(updateScroll);
+        ticking = true;
+      }
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
@@ -114,35 +145,23 @@ export default function Portfolio() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Initialize theme based on saved user preference or system preference (fallback: light)
+  // Sync theme with HTML class whenever theme changes (soft 0.35s transition on user toggle)
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
-    if (savedTheme) {
-      setTheme(savedTheme);
+    const root = document.documentElement;
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      if (theme === "dark") {
+        root.classList.add("dark");
+        root.classList.remove("light");
+      } else {
+        root.classList.remove("dark");
+        root.classList.add("light");
+      }
       return;
     }
 
-    if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      setTheme("dark");
-    } else {
-      setTheme("light");
-    }
-
-    // Listen for system theme changes if user hasn't explicitly set a preference
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleChange = (e: MediaQueryListEvent) => {
-      if (!localStorage.getItem("theme")) {
-        setTheme(e.matches ? "dark" : "light");
-      }
-    };
-
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
-
-  // Sync theme with HTML class & localStorage
-  useEffect(() => {
-    const root = document.documentElement;
+    // Apply soft transition on subsequent theme updates
+    root.classList.add("theme-transition");
     if (theme === "dark") {
       root.classList.add("dark");
       root.classList.remove("light");
@@ -150,14 +169,39 @@ export default function Portfolio() {
       root.classList.remove("dark");
       root.classList.add("light");
     }
+    const timer = window.setTimeout(() => {
+      root.classList.remove("theme-transition");
+    }, 350);
+    return () => window.clearTimeout(timer);
   }, [theme]);
 
   const toggleTheme = () => {
-    setTheme((prev) => {
-      const nextTheme = prev === "light" ? "dark" : "light";
-      localStorage.setItem("theme", nextTheme);
-      return nextTheme;
-    });
+    const nextTheme = theme === "light" ? "dark" : "light";
+    localStorage.setItem("theme", nextTheme);
+    const root = document.documentElement;
+
+    const applyThemeChange = () => {
+      if (nextTheme === "dark") {
+        root.classList.add("dark");
+        root.classList.remove("light");
+      } else {
+        root.classList.remove("dark");
+        root.classList.add("light");
+      }
+      window.dispatchEvent(new Event("theme-change"));
+    };
+
+    if (typeof document !== "undefined" && "startViewTransition" in document) {
+      (document as unknown as { startViewTransition: (cb: () => void) => void }).startViewTransition(() => {
+        applyThemeChange();
+      });
+    } else {
+      root.classList.add("theme-transition");
+      applyThemeChange();
+      window.setTimeout(() => {
+        root.classList.remove("theme-transition");
+      }, 350);
+    }
   };
 
   const handleSmoothScroll = (
@@ -168,22 +212,37 @@ export default function Portfolio() {
     setMobileMenuOpen(false);
     const element = document.getElementById(targetId);
     if (element) {
-      const topOffset = 85;
-      const elementPosition = element.getBoundingClientRect().top;
-      const offsetPosition = elementPosition + window.pageYOffset - topOffset;
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: "smooth",
-      });
+      if (lenis) {
+        lenis.scrollTo(element, {
+          offset: -85,
+          duration: 1.2,
+          easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+        });
+      } else {
+        const topOffset = 85;
+        const elementPosition = element.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - topOffset;
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: "smooth",
+        });
+      }
       window.history.pushState(null, "", `#${targetId}`);
     }
   };
 
   const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
+    if (lenis) {
+      lenis.scrollTo(0, {
+        duration: 1.2,
+        easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      });
+    } else {
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
+    }
   };
 
   const handleContactSubmit = async (e: React.FormEvent) => {
@@ -248,8 +307,8 @@ export default function Portfolio() {
     {
       title: "Backend Core & Systems",
       badge: "CORE STACK",
-      accent: "bg-[#A3E635]",
-      border: "border-black dark:border-zinc-700",
+      accent: "bg-[#A3E635] text-black dark:bg-[#A3E635]/15 dark:text-[#A3E635] dark:border-[#A3E635]/40",
+      border: "border-black dark:border-[#27272A]",
       skills: [
         { name: "Node.js", icon: Server },
         { name: "Express.js", icon: Terminal },
@@ -265,8 +324,8 @@ export default function Portfolio() {
     {
       title: "Databases, DevOps & Cloud",
       badge: "INFRASTRUCTURE",
-      accent: "bg-[#38BDF8]",
-      border: "border-black dark:border-zinc-700",
+      accent: "bg-[#38BDF8] text-black dark:bg-[#38BDF8]/15 dark:text-[#38BDF8] dark:border-[#38BDF8]/40",
+      border: "border-black dark:border-[#27272A]",
       skills: [
         { name: "MongoDB & Mongoose", icon: Database },
         { name: "Supabase", icon: Database },
@@ -279,8 +338,8 @@ export default function Portfolio() {
     {
       title: "Languages & Frontend",
       badge: "LANGUAGES & UI",
-      accent: "bg-[#FFD23F]",
-      border: "border-black dark:border-zinc-700",
+      accent: "bg-[#FFD23F] text-black dark:bg-[#FFD23F]/15 dark:text-[#FFD23F] dark:border-[#FFD23F]/40",
+      border: "border-black dark:border-[#27272A]",
       skills: [
         { name: "JavaScript (ES6+)", icon: Code2 },
         { name: "TypeScript", icon: ShieldCheck },
@@ -299,7 +358,7 @@ export default function Portfolio() {
       location: "Delhi, India",
       period: "Sep 2025 – Apr 2026",
       badge: "Full-Time",
-      accent: "bg-[#A3E635]",
+      accent: "bg-[#A3E635] text-black dark:bg-[#A3E635]/15 dark:text-[#A3E635] dark:border-[#A3E635]/40",
       points: [
         "Architected and deployed high-throughput Node.js & Express REST APIs with modular middleware architectures.",
         "Constructed complex MongoDB aggregation pipelines, query optimizations, and multi-tenant indexing strategies.",
@@ -315,7 +374,7 @@ export default function Portfolio() {
       location: "Noida, India",
       period: "Apr 2025 – Jul 2025",
       badge: "Internship",
-      accent: "bg-[#FFD23F]",
+      accent: "bg-[#FFD23F] text-black dark:bg-[#FFD23F]/15 dark:text-[#FFD23F] dark:border-[#FFD23F]/40",
       points: [
         "Developed Cryptalk: a secure messaging application emphasizing end-to-end encryption and ephemeral session handling.",
         "Engineered Style Sphere: a full-stack e-commerce web platform with cart persistency, inventory management, and checkout flows.",
@@ -330,7 +389,7 @@ export default function Portfolio() {
       name: "MSSST Trust Platform",
       domain: "mssst.in",
       tagline: "Community welfare & verified membership platform",
-      accent: "bg-[#FFD23F]",
+      accent: "bg-[#FFD23F] text-black dark:bg-[#FFD23F]/15 dark:text-[#FFD23F] dark:border-[#FFD23F]/40",
       stats: "50% Boilerplate Reduced",
       description:
         "High-reliability community welfare infrastructure featuring automated multi-step applicant verification, Cloudinary/AWS S3 document vaults, and an extensible architecture.",
@@ -347,7 +406,7 @@ export default function Portfolio() {
       name: "Lofi Radio",
       domain: "lofiradio.in",
       tagline: "Real-time sync web audio station & listener presence",
-      accent: "bg-[#A3E635]",
+      accent: "bg-[#A3E635] text-black dark:bg-[#A3E635]/15 dark:text-[#A3E635] dark:border-[#A3E635]/40",
       stats: "1-Hour Cache",
       description:
         "Ambient live audio streaming web application integrating YouTube Iframe audio streams with server-side playlist parsing and low-latency listener rooms.",
@@ -364,7 +423,7 @@ export default function Portfolio() {
       name: "Amrawati Computer Center",
       domain: "amrawaticomputer.org",
       tagline: "Full-stack digital service hub, training portal & admin ecosystem",
-      accent: "bg-[#a684ff]",
+      accent: "bg-[#a684ff] text-black dark:bg-[#a684ff]/15 dark:text-[#a684ff] dark:border-[#a684ff]/40",
       stats: "Admin Panel",
       description:
         "Comprehensive digital transformation portal for an established training center and service hub, featuring a modular Next.js frontend, secure TypeScript backend, and a dynamic role-based admin dashboard.",
@@ -381,7 +440,7 @@ export default function Portfolio() {
       name: "Success Library",
       domain: "successlibrary.in",
       tagline: "Smart study facility & concurrent seat management system",
-      accent: "bg-[#38BDF8]",
+      accent: "bg-[#38BDF8] text-black dark:bg-[#38BDF8]/15 dark:text-[#38BDF8] dark:border-[#38BDF8]/40",
       stats: "Concurrent Booking",
       description:
         "End-to-end digital management system for a premium study library, equipped with real-time seat tracking, automated membership lifecycle updates, and an admin dashboard.",
@@ -398,7 +457,7 @@ export default function Portfolio() {
       name: "Hello Her",
       domain: "helloher.in",
       tagline: "Real-time communication, voice calling & live events platform",
-      accent: "bg-[#EC4899]",
+      accent: "bg-[#EC4899] text-black dark:bg-[#EC4899]/15 dark:text-[#EC4899] dark:border-[#EC4899]/40",
       stats: "Low-Latency WebRTC",
       description:
         "Scalable real-time communication platform featuring Agora-powered voice calling, Socket.IO live chat channels, push notifications, and third-party OTP verification.",
@@ -415,7 +474,7 @@ export default function Portfolio() {
       name: "Future Past E-Commerce",
       domain: "futurepast.in",
       tagline: "Transactional order management & logistics workflow",
-      accent: "bg-[#F97316]",
+      accent: "bg-[#F97316] text-black dark:bg-[#F97316]/15 dark:text-[#F97316] dark:border-[#F97316]/40",
       stats: "Shiprocket Integration",
       description:
         "Full-stack e-commerce platform and backend engine supporting product reselling, secure payment verification, and automated shipping synchronization.",
@@ -431,11 +490,11 @@ export default function Portfolio() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#FFFDF5] dark:bg-[#121212] text-black dark:text-zinc-100 transition-colors duration-200">
+    <div className="min-h-screen bg-[#FFFDF5] dark:bg-[#0E0E10] text-black dark:text-zinc-100 bg-grid-pattern transition-colors duration-300">
       {/* Top Command Bar & Global Header with uniform height navbar items */}
       <header
         ref={headerRef}
-        className="sticky top-0 z-50 w-full bg-[#FFFDF5] dark:bg-[#121212] border-b-[3px] border-black dark:border-zinc-700"
+        className="sticky top-0 z-50 w-full bg-[#FFFDF5] dark:bg-[#0E0E10] border-b-[3px] border-black dark:border-[#27272A]"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between gap-4">
           {/* Logo / Brand Ident */}
@@ -457,7 +516,7 @@ export default function Portfolio() {
               onClick={toggleTheme}
               id="theme-toggle-btn"
               aria-label="Toggle Light and Dark Mode"
-              className="h-10.5 w-10.5 flex items-center justify-center bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100 border-[3px] border-black dark:border-zinc-700 shadow-[3px_3px_0_0_#000] dark:shadow-[3px_3px_0_0_#3F3F46] hover:bg-[#FFD23F] dark:hover:bg-[#FFD23F] dark:hover:text-black transition-colors cursor-pointer"
+              className="h-10.5 w-10.5 flex items-center justify-center bg-white dark:bg-[#18181B] text-black dark:text-zinc-100 border-[3px] border-black dark:border-[#27272A] shadow-[3px_3px_0_0_#000] hover:bg-[#FFD23F] dark:hover:bg-[#FFD23F] dark:hover:text-black transition-colors cursor-pointer"
             >
               {theme === "light" ? (
                 <Moon className="w-5 h-5 text-black" />
@@ -469,7 +528,7 @@ export default function Portfolio() {
             {/* Mobile Hamburger Toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden h-10.5 w-10.5 flex items-center justify-center bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100 border-[3px] border-black dark:border-zinc-700 shadow-[3px_3px_0_0_#000] dark:shadow-[3px_3px_0_0_#3F3F46] cursor-pointer"
+              className="md:hidden h-10.5 w-10.5 flex items-center justify-center bg-white dark:bg-[#18181B] text-black dark:text-zinc-100 border-[3px] border-black dark:border-[#27272A] shadow-[3px_3px_0_0_#000] cursor-pointer"
               aria-label="Toggle navigation drawer"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -479,13 +538,13 @@ export default function Portfolio() {
 
         {/* Mobile Navigation Drawer */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t-[3px] border-black dark:border-zinc-700 bg-[#FFFDF5] dark:bg-[#121212] p-4 flex flex-col gap-3">
+          <div className="md:hidden border-t-[3px] border-black dark:border-[#27272A] bg-[#FFFDF5] dark:bg-[#0E0E10] p-4 flex flex-col gap-3">
             <a
               href="#hero"
               onClick={(e) => handleSmoothScroll(e, "hero")}
-              className={`flex items-center gap-3 p-3 font-mono font-bold text-sm border-[2px] border-black dark:border-zinc-700 shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] cursor-pointer transition-colors ${activeSection === "hero"
+              className={`flex items-center gap-3 p-3 font-mono font-bold text-sm border-[2px] border-black dark:border-[#27272A] shadow-[2px_2px_0_0_#000] cursor-pointer transition-colors ${activeSection === "hero"
                 ? "bg-[#FFD23F] text-black"
-                : "bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100"
+                : "bg-white dark:bg-[#18181B] text-black dark:text-zinc-100"
                 }`}
             >
               <Terminal className={`w-4 h-4 ${activeSection === "hero" ? "text-black" : "text-black dark:text-[#FFD23F]"}`} /> Command Center
@@ -493,9 +552,9 @@ export default function Portfolio() {
             <a
               href="#tech-stack"
               onClick={(e) => handleSmoothScroll(e, "tech-stack")}
-              className={`flex items-center gap-3 p-3 font-mono font-bold text-sm border-[2px] border-black dark:border-zinc-700 shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] cursor-pointer transition-colors ${activeSection === "tech-stack"
-                ? "bg-[#A3E635] text-black"
-                : "bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100"
+              className={`flex items-center gap-3 p-3 font-mono font-bold text-sm border-[2px] border-black dark:border-[#27272A] shadow-[2px_2px_0_0_#000] cursor-pointer transition-colors ${activeSection === "tech-stack"
+                ? "bg-[#A3E635] text-black dark:bg-[#A3E635]/15 dark:text-[#A3E635] dark:border-[#A3E635]/40"
+                : "bg-white dark:bg-[#18181B] text-black dark:text-zinc-100"
                 }`}
             >
               <Cpu className={`w-4 h-4 ${activeSection === "tech-stack" ? "text-black" : "text-black dark:text-[#A3E635]"}`} /> Tech Stack & Capabilities
@@ -503,9 +562,9 @@ export default function Portfolio() {
             <a
               href="#experience"
               onClick={(e) => handleSmoothScroll(e, "experience")}
-              className={`flex items-center gap-3 p-3 font-mono font-bold text-sm border-[2px] border-black dark:border-zinc-700 shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] cursor-pointer transition-colors ${activeSection === "experience"
-                ? "bg-[#38BDF8] text-black"
-                : "bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100"
+              className={`flex items-center gap-3 p-3 font-mono font-bold text-sm border-[2px] border-black dark:border-[#27272A] shadow-[2px_2px_0_0_#000] cursor-pointer transition-colors ${activeSection === "experience"
+                ? "bg-[#38BDF8] text-black dark:bg-[#38BDF8]/15 dark:text-[#38BDF8] dark:border-[#38BDF8]/40"
+                : "bg-white dark:bg-[#18181B] text-black dark:text-zinc-100"
                 }`}
             >
               <Briefcase className={`w-4 h-4 ${activeSection === "experience" ? "text-black" : "text-black dark:text-[#38BDF8]"}`} /> Work Experience
@@ -513,9 +572,9 @@ export default function Portfolio() {
             <a
               href="#projects"
               onClick={(e) => handleSmoothScroll(e, "projects")}
-              className={`flex items-center gap-3 p-3 font-mono font-bold text-sm border-[2px] border-black dark:border-zinc-700 shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] cursor-pointer transition-colors ${activeSection === "projects"
-                ? "bg-[#FF6B6B] text-black"
-                : "bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100"
+              className={`flex items-center gap-3 p-3 font-mono font-bold text-sm border-[2px] border-black dark:border-[#27272A] shadow-[2px_2px_0_0_#000] cursor-pointer transition-colors ${activeSection === "projects"
+                ? "bg-[#FF6B6B] text-black dark:bg-[#FF6B6B]/15 dark:text-[#FF6B6B] dark:border-[#FF6B6B]/40"
+                : "bg-white dark:bg-[#18181B] text-black dark:text-zinc-100"
                 }`}
             >
               <FolderGit2 className={`w-4 h-4 ${activeSection === "projects" ? "text-black" : "text-black dark:text-[#FF6B6B]"}`} /> Featured Projects
@@ -523,14 +582,14 @@ export default function Portfolio() {
             <a
               href="#contact"
               onClick={(e) => handleSmoothScroll(e, "contact")}
-              className={`flex items-center gap-3 p-3 font-mono font-bold text-sm border-[2px] border-black dark:border-zinc-700 shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] cursor-pointer transition-colors ${activeSection === "contact"
-                ? "bg-[#C084FC] text-black"
-                : "bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100"
+              className={`flex items-center gap-3 p-3 font-mono font-bold text-sm border-[2px] border-black dark:border-[#27272A] shadow-[2px_2px_0_0_#000] cursor-pointer transition-colors ${activeSection === "contact"
+                ? "bg-[#C084FC] text-black dark:bg-[#C084FC]/15 dark:text-[#C084FC] dark:border-[#C084FC]/40"
+                : "bg-white dark:bg-[#18181B] text-black dark:text-zinc-100"
                 }`}
             >
               <Mail className={`w-4 h-4 ${activeSection === "contact" ? "text-black" : "text-black dark:text-[#C084FC]"}`} /> Contact Me
             </a>
-            <div className="flex items-center gap-2 p-2.5 bg-[#A3E635] text-black font-mono font-bold text-xs border-[2px] border-black">
+            <div className="flex items-center gap-2 p-2.5 bg-[#A3E635] text-black dark:bg-[#A3E635]/15 dark:text-[#A3E635] dark:border-[#A3E635]/40 font-mono font-bold text-xs border-[2px] border-black">
               <CheckCircle className="w-4 h-4" /> Available for Hire in Bengaluru
             </div>
           </div>
@@ -552,8 +611,8 @@ export default function Portfolio() {
         <aside className="hidden md:block w-64 shrink-0">
           <div className="sticky top-24 flex flex-col gap-6">
             {/* Profile Neo-Box */}
-            <div className="bg-white dark:bg-[#1A1A1A] border-[3px] border-black dark:border-zinc-700 shadow-[5px_5px_0_0_#000] dark:shadow-[5px_5px_0_0_#3F3F46] p-4">
-              <div className="relative w-full h-48 bg-[#FFD23F] border-[3px] border-black dark:border-zinc-700 overflow-hidden mb-4 shadow-[3px_3px_0_0_#000]">
+            <div className="bg-white dark:bg-[#18181B] border-[3px] border-black dark:border-[#27272A] shadow-[5px_5px_0_0_#000] p-4">
+              <div className="relative w-full h-48 bg-[#FFD23F] border-[3px] border-black dark:border-[#27272A] overflow-hidden mb-4 shadow-[3px_3px_0_0_#000]">
                 <Image
                   src="/Arpit.jpg"
                   alt="Arpit Sharma"
@@ -569,14 +628,14 @@ export default function Portfolio() {
               </p>
 
               {/* Status Indicator */}
-              <div className="mt-4 p-2 bg-[#A3E635] text-black border-[2px] border-black shadow-[2px_2px_0_0_#000] flex items-center gap-2 font-mono text-xs font-bold">
+              <div className="mt-4 p-2 bg-[#A3E635] text-black dark:bg-[#A3E635]/15 dark:text-[#A3E635] dark:border-[#A3E635]/40 border-[2px] border-black shadow-[2px_2px_0_0_#000] flex items-center gap-2 font-mono text-xs font-bold">
                 <CheckCircle className="w-4 h-4" />
                 <span>Open to Backend Roles</span>
               </div>
             </div>
 
             {/* Sidebar Navigation with dynamic active highlight & smooth scroll */}
-            <nav className="bg-white dark:bg-[#1A1A1A] border-[3px] border-black dark:border-zinc-700 shadow-[5px_5px_0_0_#000] dark:shadow-[5px_5px_0_0_#3F3F46] p-3 flex flex-col gap-2">
+            <nav className="bg-white dark:bg-[#18181B] border-[3px] border-black dark:border-[#27272A] shadow-[5px_5px_0_0_#000] p-3 flex flex-col gap-2">
               <span className="font-mono text-[10px] uppercase font-bold tracking-widest text-zinc-500 px-2 py-1">
                 Navigation
               </span>
@@ -633,7 +692,7 @@ export default function Portfolio() {
             </nav>
 
             {/* External Links Neo-Box */}
-            <div className="bg-white dark:bg-[#1A1A1A] border-[3px] border-black dark:border-zinc-700 shadow-[5px_5px_0_0_#000] dark:shadow-[5px_5px_0_0_#3F3F46] p-3 flex flex-col gap-2 font-mono text-xs">
+            <div className="bg-white dark:bg-[#18181B] border-[3px] border-black dark:border-[#27272A] shadow-[5px_5px_0_0_#000] p-3 flex flex-col gap-2 font-mono text-xs">
               <span className="font-mono text-[10px] uppercase font-bold tracking-widest text-zinc-500 px-2 py-1">
                 External Profiles
               </span>
@@ -641,7 +700,7 @@ export default function Portfolio() {
                 href="https://github.com/iamarpitsharma"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-between px-3 py-2 border-[2px] border-black dark:border-zinc-700 bg-[#FFFDF5] dark:bg-[#121212] hover:bg-[#FFD23F] hover:text-black transition-colors cursor-pointer"
+                className="flex items-center justify-between px-3 py-2 border-[2px] border-black dark:border-[#27272A] bg-[#FFFDF5] dark:bg-[#0E0E10] hover:bg-[#FFD23F] hover:text-black transition-colors cursor-pointer"
               >
                 <span className="flex items-center gap-2">
                   <GitFork className="w-4 h-4" /> GitHub
@@ -652,7 +711,7 @@ export default function Portfolio() {
                 href="https://linkedin.com/in/iarpitsharma"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-between px-3 py-2 border-[2px] border-black dark:border-zinc-700 bg-[#FFFDF5] dark:bg-[#121212] hover:bg-[#38BDF8] hover:text-black transition-colors cursor-pointer"
+                className="flex items-center justify-between px-3 py-2 border-[2px] border-black dark:border-[#27272A] bg-[#FFFDF5] dark:bg-[#0E0E10] hover:bg-[#38BDF8] hover:text-black transition-colors cursor-pointer"
               >
                 <span className="flex items-center gap-2">
                   <Share2 className="w-4 h-4" /> LinkedIn
@@ -662,7 +721,7 @@ export default function Portfolio() {
               <a
                 href="/Arpit Resume.pdf"
                 download="Arpit_Sharma_Resume.pdf"
-                className="flex items-center justify-between px-3 py-2 border-[2px] border-black dark:border-zinc-700 bg-[#FFFDF5] dark:bg-[#121212] hover:bg-[#A3E635] hover:text-black transition-colors cursor-pointer"
+                className="flex items-center justify-between px-3 py-2 border-[2px] border-black dark:border-[#27272A] bg-[#FFFDF5] dark:bg-[#0E0E10] hover:bg-[#A3E635] hover:text-black transition-colors cursor-pointer"
               >
                 <span className="flex items-center gap-2">
                   <FileText className="w-4 h-4" /> Resume PDF
@@ -677,17 +736,17 @@ export default function Portfolio() {
         <main className="flex-1 flex flex-col gap-12 w-full overflow-hidden">
           {/* SECTION 1: HERO COMMAND CENTER SECTION */}
           <section id="hero" className="w-full scroll-mt-24">
-            <div className="bg-white dark:bg-[#1A1A1A] border-[3px] border-black dark:border-zinc-700 shadow-[8px_8px_0_0_#000] dark:shadow-[8px_8px_0_0_#3F3F46] p-6 sm:p-8">
+            <div className="bg-white dark:bg-[#18181B] border-[3px] border-black dark:border-[#27272A] shadow-[8px_8px_0_0_#000] p-6 sm:p-8">
               {/* Terminal Title Bar */}
-              <div className="flex items-center justify-between gap-2 pb-4 mb-6 border-b-[3px] border-black dark:border-zinc-700">
+              <div className="flex items-center justify-between gap-2 pb-4 mb-6 border-b-[3px] border-black dark:border-[#27272A]">
                 <div className="flex items-center gap-1.5 sm:gap-2 font-mono text-xs font-bold truncate">
-                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-[#FF6B6B] border-[2px] border-black dark:border-zinc-700 shrink-0" />
-                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-[#FFD23F] border-[2px] border-black dark:border-zinc-700 shrink-0" />
-                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-[#A3E635] border-[2px] border-black dark:border-zinc-700 shrink-0" />
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-[#FF6B6B] border-[2px] border-black dark:border-[#27272A] shrink-0" />
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-[#FFD23F] border-[2px] border-black dark:border-[#27272A] shrink-0" />
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-[#A3E635] border-[2px] border-black dark:border-[#27272A] shrink-0" />
                   <span className="ml-1 sm:ml-2 block sm:hidden truncate">DEV://ARPIT_SHARMA.EXE</span>
                   <span className="ml-1 sm:ml-2 hidden sm:block truncate">DEV://BENGALURU/ARPIT_SHARMA.EXE</span>
                 </div>
-                <div className="flex items-center gap-1.5 sm:gap-2 font-mono text-[10px] sm:text-xs bg-[#A3E635] text-black px-2 sm:px-2.5 py-1 border-[2px] border-black font-bold shrink-0">
+                <div className="flex items-center gap-1.5 sm:gap-2 font-mono text-[10px] sm:text-xs bg-[#A3E635] text-black dark:bg-[#A3E635]/15 dark:text-[#A3E635] dark:border-[#A3E635]/40 px-2 sm:px-2.5 py-1 border-[2px] border-black font-bold shrink-0">
                   <CheckCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   <span>ONLINE & AVAILABLE</span>
                 </div>
@@ -695,7 +754,7 @@ export default function Portfolio() {
 
               {/* Title & Headline */}
               <div className="space-y-4">
-                <div className="inline-block bg-[#FFD23F] text-black px-3 py-1 text-xs font-mono font-bold border-[2px] border-black shadow-[3px_3px_0_0_#000]">
+                <div className="inline-block bg-[#FFD23F] text-black dark:bg-[#FFD23F]/15 dark:text-[#FFD23F] dark:border-[#FFD23F]/40 px-3 py-1 text-xs font-mono font-bold border-[2px] border-black shadow-[3px_3px_0_0_#000]">
                   SYSTEM_ROLE: BACKEND_DEVELOPER
                 </div>
                 <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black font-mono tracking-tight leading-tight">
@@ -712,7 +771,7 @@ export default function Portfolio() {
               </div>
 
               {/* Live Status Ticker */}
-              <div className="mt-6 p-4 bg-[#FFFDF5] dark:bg-[#121212] border-[3px] border-black dark:border-zinc-700 shadow-[5px_5px_0_0_#000] dark:shadow-[5px_5px_0_0_#3F3F46]">
+              <div className="mt-6 p-4 bg-[#FFFDF5] dark:bg-[#0E0E10] border-[3px] border-black dark:border-[#27272A] shadow-[5px_5px_0_0_#000]">
                 <div className="flex items-start sm:items-center gap-3">
                   <div className="p-2 bg-[#FFD23F] text-black border-[2px] border-black shrink-0">
                     <Zap className="w-5 h-5" />
@@ -751,7 +810,7 @@ export default function Portfolio() {
                 <a
                   href="#contact"
                   onClick={(e) => handleSmoothScroll(e, "contact")}
-                  className="w-full h-12 flex items-center justify-center gap-2 bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100 font-mono font-bold text-xs sm:text-sm border-[3px] border-black dark:border-zinc-700 shadow-[4px_4px_0_0_#000] dark:shadow-[4px_4px_0_0_#3F3F46] hover:translate-x-0.5 hover:translate-y-0.5 transition-transform cursor-pointer"
+                  className="w-full h-12 flex items-center justify-center gap-2 bg-white dark:bg-[#18181B] text-black dark:text-zinc-100 font-mono font-bold text-xs sm:text-sm border-[3px] border-black dark:border-[#27272A] shadow-[4px_4px_0_0_#000] hover:translate-x-0.5 hover:translate-y-0.5 transition-transform cursor-pointer"
                 >
                   <Mail className="w-4 h-4 shrink-0" />
                   <span>Get in Touch</span>
@@ -791,16 +850,16 @@ export default function Portfolio() {
                 return (
                   <div
                     key={catIdx}
-                    className="bg-white dark:bg-[#1A1A1A] border-[3px] border-black dark:border-zinc-700 shadow-[6px_6px_0_0_#000] dark:shadow-[6px_6px_0_0_#3F3F46] p-4 sm:p-6"
+                    className="bg-white dark:bg-[#18181B] border-[3px] border-black dark:border-[#27272A] shadow-[6px_6px_0_0_#000] p-4 sm:p-6"
                   >
                     {/* Header: clickable button on mobile to toggle collapse, static header on desktop */}
                     <div
                       onClick={toggleCategory}
-                      className="flex items-center justify-between pb-3.5 border-b-[2px] border-black dark:border-zinc-700 cursor-pointer sm:cursor-default select-none"
+                      className="flex items-center justify-between pb-3.5 border-b-[2px] border-black dark:border-[#27272A] cursor-pointer sm:cursor-default select-none"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <span
-                          className={`px-3 py-1 text-xs font-mono font-bold border-[2px] border-black text-black shrink-0 whitespace-nowrap ${cat.accent}`}
+                          className={`px-3 py-1 text-xs font-mono font-bold border-[2px] border-black shrink-0 whitespace-nowrap ${cat.accent}`}
                         >
                           {cat.badge}
                         </span>
@@ -817,7 +876,7 @@ export default function Portfolio() {
                         <button
                           type="button"
                           aria-label={isExpanded ? "Collapse category" : "Expand category"}
-                          className="sm:hidden flex items-center gap-1 font-mono text-[11px] font-bold px-2 py-1 bg-[#FFFDF5] dark:bg-[#222] border-[1.5px] border-black dark:border-zinc-600 shadow-[1.5px_1.5px_0_0_#000] active:translate-x-0.5 active:translate-y-0.5 transition-transform"
+                          className="sm:hidden flex items-center gap-1 font-mono text-[11px] font-bold px-2 py-1 bg-[#FFFDF5] dark:bg-[#18181B] border-[1.5px] border-black dark:border-[#27272A] shadow-[1.5px_1.5px_0_0_#000] active:translate-x-0.5 active:translate-y-0.5 transition-transform"
                         >
                           <span>{isExpanded ? "HIDE" : "SHOW"}</span>
                           <ChevronDown
@@ -842,17 +901,17 @@ export default function Portfolio() {
                             return (
                               <div
                                 key={sIdx}
-                                className="flex items-center justify-between p-3 bg-[#FFFDF5] dark:bg-[#141414] border-[2px] border-black dark:border-zinc-700 shadow-[3px_3px_0_0_#000] dark:shadow-[3px_3px_0_0_#3F3F46] hover:-translate-y-0.5 hover:translate-x-0.5 hover:shadow-[4px_4px_0_0_#000] dark:hover:shadow-[4px_4px_0_0_#3F3F46] transition-all cursor-default group"
+                                className="flex items-center justify-between p-3 bg-[#FFFDF5] dark:bg-[#18181B] border-[2px] border-black dark:border-[#27272A] shadow-[3px_3px_0_0_#000] hover:-translate-y-0.5 hover:translate-x-0.5 hover:shadow-[4px_4px_0_0_#000] transition-all cursor-default group"
                               >
                                 <div className="flex items-center gap-3 min-w-0">
-                                  <div className="p-2 bg-white dark:bg-[#222] border-[1.5px] border-black dark:border-zinc-700 text-black dark:text-zinc-100 group-hover:bg-[#FFD23F] group-hover:text-black transition-colors shrink-0">
+                                  <div className="p-2 bg-white dark:bg-[#27272A] border-[1.5px] border-black dark:border-[#27272A] text-black dark:text-zinc-100 group-hover:bg-[#FFD23F] group-hover:text-black transition-colors shrink-0">
                                     <Icon className="w-4 h-4" />
                                   </div>
                                   <span className="font-mono text-xs sm:text-sm font-bold text-black dark:text-zinc-100 truncate tracking-tight">
                                     {skill.name}
                                   </span>
                                 </div>
-                                <span className="w-2 h-2 rounded-none bg-black dark:bg-zinc-700 group-hover:bg-[#A3E635] transition-colors shrink-0 ml-2" />
+                                <span className="w-2 h-2 rounded-none bg-black dark:bg-[#27272A] group-hover:bg-[#A3E635] transition-colors shrink-0 ml-2" />
                               </div>
                             );
                           })}
@@ -885,14 +944,14 @@ export default function Portfolio() {
               {workExperience.map((job, idx) => (
                 <div
                   key={idx}
-                  className="bg-white dark:bg-[#1A1A1A] border-[3px] border-black dark:border-zinc-700 shadow-[5px_5px_0_0_#000] dark:shadow-[5px_5px_0_0_#3F3F46] p-6 relative"
+                  className="bg-white dark:bg-[#18181B] border-[3px] border-black dark:border-[#27272A] shadow-[5px_5px_0_0_#000] p-6 relative"
                 >
                   {/* Top Bar with Role & Meta */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b-[2px] border-black dark:border-zinc-700">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b-[2px] border-black dark:border-[#27272A]">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span
-                          className={`font-mono text-xs font-extrabold px-2.5 py-0.5 border-[2px] border-black text-black ${job.accent}`}
+                          className={`font-mono text-xs font-extrabold px-2.5 py-0.5 border-[2px] border-black shrink-0 ${job.accent}`}
                         >
                           {job.badge}
                         </span>
@@ -906,7 +965,7 @@ export default function Portfolio() {
                         </span>
                       </div>
                     </div>
-                    <div className="font-mono text-xs font-bold px-3 py-1.5 bg-[#FFFDF5] dark:bg-[#121212] border-[2px] border-black dark:border-zinc-700 shrink-0 self-start sm:self-center shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] flex items-center gap-1.5">
+                    <div className="font-mono text-xs font-bold px-3 py-1.5 bg-[#FFFDF5] dark:bg-[#0E0E10] border-[2px] border-black dark:border-[#27272A] shrink-0 self-start sm:self-center shadow-[2px_2px_0_0_#000] flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5" />
                       {job.period}
                     </div>
@@ -925,11 +984,11 @@ export default function Portfolio() {
                   </ul>
 
                   {/* Tech stack pill tags */}
-                  <div className="mt-5 pt-4 border-t-[2px] border-dashed border-black/40 dark:border-zinc-700 flex flex-wrap gap-2">
+                  <div className="mt-5 pt-4 border-t-[2px] border-dashed border-black/40 dark:border-[#27272A] flex flex-wrap gap-2">
                     {job.tags.map((tag, tIdx) => (
                       <span
                         key={tIdx}
-                        className="px-2.5 py-1 text-xs font-mono font-bold bg-[#FFFDF5] dark:bg-[#121212] border-[2px] border-black dark:border-zinc-700 shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46]"
+                        className="px-2.5 py-1 text-xs font-mono font-bold bg-[#FFFDF5] dark:bg-[#18181B] text-black dark:text-zinc-300 border-[2px] border-black dark:border-[#27272A] shadow-[2px_2px_0_0_#000]"
                       >
                         #{tag}
                       </span>
@@ -960,19 +1019,19 @@ export default function Portfolio() {
               {projects.map((proj, pIdx) => (
                 <div
                   key={pIdx}
-                  className="bg-white dark:bg-[#1A1A1A] border-[3px] border-black dark:border-zinc-700 shadow-[8px_8px_0_0_#000] dark:shadow-[8px_8px_0_0_#3F3F46] flex flex-col justify-between"
+                  className="bg-white dark:bg-[#18181B] border-[3px] border-black dark:border-[#27272A] shadow-[8px_8px_0_0_#000] flex flex-col justify-between"
                 >
                   <div>
                     {/* Project Header Bar */}
-                    <div className="p-4 border-b-[3px] border-black dark:border-zinc-700 flex items-center justify-between bg-[#FFFDF5] dark:bg-[#121212]">
+                    <div className="p-4 border-b-[3px] border-black dark:border-[#27272A] flex items-center justify-between bg-[#FFFDF5] dark:bg-[#0E0E10]">
                       <div className="flex items-center gap-2">
                         <span
-                          className={`font-mono text-xs font-bold px-2 py-0.5 border-[2px] border-black text-black ${proj.accent}`}
+                          className={`font-mono text-xs font-bold px-2 py-0.5 border-[2px] border-black shrink-0 ${proj.accent}`}
                         >
                           PROD://{proj.domain}
                         </span>
                       </div>
-                      <span className="font-mono text-xs font-bold px-2 py-0.5 bg-black text-white dark:bg-zinc-100 dark:text-black">
+                      <span className="font-mono text-xs font-bold px-2 py-0.5 bg-black text-white dark:bg-[#27272A] dark:text-zinc-200 border-[1.5px] border-black dark:border-[#27272A]">
                         {proj.stats}
                       </span>
                     </div>
@@ -990,7 +1049,7 @@ export default function Portfolio() {
                         {proj.description}
                       </p>
 
-                      <div className="mt-4 p-3 bg-[#FFFDF5] dark:bg-[#121212] border-[2px] border-black dark:border-zinc-700 shadow-[3px_3px_0_0_#000] dark:shadow-[3px_3px_0_0_#3F3F46]">
+                      <div className="mt-4 p-3 bg-[#FFFDF5] dark:bg-[#0E0E10] border-[2px] border-black dark:border-[#27272A] shadow-[3px_3px_0_0_#000]">
                         <span className="font-mono text-[10px] uppercase font-bold text-zinc-500 block mb-2">
                           Engineering Highlights
                         </span>
@@ -1012,14 +1071,14 @@ export default function Portfolio() {
                       {proj.stack.map((s, sIdx) => (
                         <span
                           key={sIdx}
-                          className="px-2 py-0.5 font-mono text-[11px] font-bold bg-white dark:bg-[#222] border-[1.5px] border-black dark:border-zinc-700"
+                          className="px-2 py-0.5 font-mono text-[11px] font-bold bg-white dark:bg-[#27272A]/40 text-black dark:text-zinc-300 border-[1.5px] border-black dark:border-[#27272A]"
                         >
                           {s}
                         </span>
                       ))}
                     </div>
 
-                    <div className="flex items-center gap-3 pt-4 border-t-[2px] border-black dark:border-zinc-700">
+                    <div className="flex items-center gap-3 pt-4 border-t-[2px] border-black dark:border-[#27272A]">
                       <a
                         href={proj.liveUrl}
                         target="_blank"
@@ -1033,7 +1092,7 @@ export default function Portfolio() {
                         href={proj.repoUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="py-2.5 px-4 bg-white dark:bg-[#1A1A1A] text-black dark:text-zinc-100 font-mono font-bold text-xs border-[2px] border-black dark:border-zinc-700 shadow-[3px_3px_0_0_#000] dark:shadow-[3px_3px_0_0_#3F3F46] hover:translate-x-0.5 hover:translate-y-0.5 transition-transform flex items-center gap-1.5 cursor-pointer"
+                        className="py-2.5 px-4 bg-white dark:bg-[#18181B] text-black dark:text-zinc-100 font-mono font-bold text-xs border-[2px] border-black dark:border-[#27272A] shadow-[3px_3px_0_0_#000] hover:translate-x-0.5 hover:translate-y-0.5 transition-transform flex items-center gap-1.5 cursor-pointer"
                       >
                         <GitFork className="w-3.5 h-3.5" /> Code
                       </a>
@@ -1060,7 +1119,7 @@ export default function Portfolio() {
               </div>
             </div>
 
-            <div className="bg-white dark:bg-[#1A1A1A] border-[3px] border-black dark:border-zinc-700 shadow-[8px_8px_0_0_#000] dark:shadow-[8px_8px_0_0_#3F3F46] p-6 sm:p-8">
+            <div className="bg-white dark:bg-[#18181B] border-[3px] border-black dark:border-[#27272A] shadow-[8px_8px_0_0_#000] dark:shadow-[8px_8px_0_0_#000000] p-6 sm:p-8">
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
                 {/* Left side: Direct contact badges */}
                 <div className="lg:col-span-2 flex flex-col justify-between gap-6">
@@ -1074,7 +1133,7 @@ export default function Portfolio() {
                       {/* Email Badge */}
                       <a
                         href="mailto:arpitsharma684@gmail.com"
-                        className="p-3 bg-[#FFFDF5] dark:bg-[#121212] border-[2px] border-black dark:border-zinc-700 shadow-[3px_3px_0_0_#000] dark:shadow-[3px_3px_0_0_#3F3F46] hover:bg-[#FFD23F] hover:text-black transition-colors block cursor-pointer group"
+                        className="p-3 bg-[#FFFDF5] dark:bg-[#0E0E10] border-[2px] border-black dark:border-[#27272A] shadow-[3px_3px_0_0_#000] dark:shadow-[3px_3px_0_0_#000000] hover:bg-[#FFD23F] hover:text-black transition-colors block cursor-pointer group"
                       >
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-1.5">
@@ -1090,7 +1149,7 @@ export default function Portfolio() {
                       {/* Phone Badge */}
                       <a
                         href="tel:+918765710580"
-                        className="p-3 bg-[#FFFDF5] dark:bg-[#121212] border-[2px] border-black dark:border-zinc-700 shadow-[3px_3px_0_0_#000] dark:shadow-[3px_3px_0_0_#3F3F46] hover:bg-[#A3E635] hover:text-black transition-colors block cursor-pointer group"
+                        className="p-3 bg-[#FFFDF5] dark:bg-[#0E0E10] border-[2px] border-black dark:border-[#27272A] shadow-[3px_3px_0_0_#000] dark:shadow-[3px_3px_0_0_#000000] hover:bg-[#A3E635] hover:text-black transition-colors block cursor-pointer group"
                       >
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-1.5">
@@ -1108,7 +1167,7 @@ export default function Portfolio() {
                         href="https://linkedin.com/in/iarpitsharma"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-3 bg-[#FFFDF5] dark:bg-[#121212] border-[2px] border-black dark:border-zinc-700 shadow-[3px_3px_0_0_#000] dark:shadow-[3px_3px_0_0_#3F3F46] hover:bg-[#38BDF8] hover:text-black transition-colors block cursor-pointer group"
+                        className="p-3 bg-[#FFFDF5] dark:bg-[#0E0E10] border-[2px] border-black dark:border-[#27272A] shadow-[3px_3px_0_0_#000] dark:shadow-[3px_3px_0_0_#000000] hover:bg-[#38BDF8] hover:text-black transition-colors block cursor-pointer group"
                       >
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] text-zinc-500 group-hover:text-zinc-900 uppercase font-bold flex items-center gap-2">
@@ -1127,7 +1186,7 @@ export default function Portfolio() {
                         href="https://github.com/iamarpitsharma"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-3 bg-[#FFFDF5] dark:bg-[#121212] border-[2px] border-black dark:border-zinc-700 shadow-[3px_3px_0_0_#000] dark:shadow-[3px_3px_0_0_#3F3F46] hover:bg-[#FF6B6B] hover:text-white transition-colors block cursor-pointer group"
+                        className="p-3 bg-[#FFFDF5] dark:bg-[#0E0E10] border-[2px] border-black dark:border-[#27272A] shadow-[3px_3px_0_0_#000] dark:shadow-[3px_3px_0_0_#000000] hover:bg-[#FF6B6B] hover:text-white transition-colors block cursor-pointer group"
                       >
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] text-zinc-500 group-hover:text-white uppercase font-bold flex items-center gap-2">
@@ -1151,7 +1210,7 @@ export default function Portfolio() {
                 </div>
 
                 {/* Right side: Interactive Contact Form with crystal-clear dynamic placeholder contrast */}
-                <div className="lg:col-span-3 bg-[#FFFDF5] dark:bg-[#121212] border-[3px] border-black dark:border-zinc-700 shadow-[5px_5px_0_0_#000] dark:shadow-[5px_5px_0_0_#3F3F46] p-6">
+                <div className="lg:col-span-3 bg-[#FFFDF5] dark:bg-[#0E0E10] border-[3px] border-black dark:border-[#27272A] shadow-[5px_5px_0_0_#000] dark:shadow-[5px_5px_0_0_#000000] p-6">
                   <h4 className="font-mono text-base font-bold mb-4 flex items-center gap-2">
                     <Terminal className="w-4 h-4 text-[#FFD23F]" /> Send a Direct Transmission
                   </h4>
@@ -1183,7 +1242,7 @@ export default function Portfolio() {
                           }
                           placeholder="Arpit Sharma"
                           disabled={contactSending}
-                          className="w-full px-3 py-2 text-xs font-mono bg-white dark:bg-[#1A1A1A] text-black dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 border-[2px] border-black dark:border-zinc-700 rounded-none shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] focus:outline-none focus:bg-[#FFD23F] focus:text-black focus:placeholder:text-zinc-700 disabled:opacity-60"
+                          className="w-full px-3 py-2 text-xs font-mono bg-white dark:bg-[#18181B] text-black dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 border-[2px] border-black dark:border-[#27272A] rounded-none shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#000000] focus:outline-none focus:bg-[#FFD23F] focus:text-black focus:placeholder:text-zinc-700 disabled:opacity-60"
                         />
                       </div>
                       <div>
@@ -1199,7 +1258,7 @@ export default function Portfolio() {
                           }
                           placeholder="arpit@tech.co"
                           disabled={contactSending}
-                          className="w-full px-3 py-2 text-xs font-mono bg-white dark:bg-[#1A1A1A] text-black dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 border-[2px] border-black dark:border-zinc-700 rounded-none shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] focus:outline-none focus:bg-[#FFD23F] focus:text-black focus:placeholder:text-zinc-700 disabled:opacity-60"
+                          className="w-full px-3 py-2 text-xs font-mono bg-white dark:bg-[#18181B] text-black dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 border-[2px] border-black dark:border-[#27272A] rounded-none shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#000000] focus:outline-none focus:bg-[#FFD23F] focus:text-black focus:placeholder:text-zinc-700 disabled:opacity-60"
                         />
                       </div>
                     </div>
@@ -1216,7 +1275,7 @@ export default function Portfolio() {
                         }
                         placeholder="Need backend developer for custom SaaS / Backend Role"
                         disabled={contactSending}
-                        className="w-full px-3 py-2 text-xs font-mono bg-white dark:bg-[#1A1A1A] text-black dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 border-[2px] border-black dark:border-zinc-700 rounded-none shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] focus:outline-none focus:bg-[#FFD23F] focus:text-black focus:placeholder:text-zinc-700 disabled:opacity-60"
+                        className="w-full px-3 py-2 text-xs font-mono bg-white dark:bg-[#18181B] text-black dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 border-[2px] border-black dark:border-[#27272A] rounded-none shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#000000] focus:outline-none focus:bg-[#FFD23F] focus:text-black focus:placeholder:text-zinc-700 disabled:opacity-60"
                       />
                     </div>
 
@@ -1233,7 +1292,7 @@ export default function Portfolio() {
                         }
                         placeholder="Hey Arpit, we want to build a high-performance backend / discuss a project or role..."
                         disabled={contactSending}
-                        className="w-full px-3 py-2 text-xs font-mono bg-white dark:bg-[#1A1A1A] text-black dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 border-[2px] border-black dark:border-zinc-700 rounded-none shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#3F3F46] focus:outline-none focus:bg-[#FFD23F] focus:text-black focus:placeholder:text-zinc-700 disabled:opacity-60"
+                        className="w-full px-3 py-2 text-xs font-mono bg-white dark:bg-[#18181B] text-black dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 border-[2px] border-black dark:border-[#27272A] rounded-none shadow-[2px_2px_0_0_#000] dark:shadow-[2px_2px_0_0_#000000] focus:outline-none focus:bg-[#FFD23F] focus:text-black focus:placeholder:text-zinc-700 disabled:opacity-60"
                       />
                     </div>
 

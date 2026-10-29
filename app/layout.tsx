@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Syne, Space_Grotesk, Inter, Space_Mono } from "next/font/google";
+import "lenis/dist/lenis.css";
 import "./globals.css";
+import SmoothScroll from "./components/SmoothScroll";
 
 const syne = Syne({
   subsets: ["latin"],
@@ -82,9 +84,11 @@ export default function RootLayout({
       </head>
       <body
         suppressHydrationWarning
-        className={`${syne.variable} ${spaceGrotesk.variable} ${inter.variable} ${spaceMono.variable} antialiased`}
+        className={`${syne.variable} ${spaceGrotesk.variable} ${inter.variable} ${spaceMono.variable} antialiased bg-grid-pattern`}
       >
-        {children}
+        <SmoothScroll>
+          {children}
+        </SmoothScroll>
       </body>
     </html>
   );
