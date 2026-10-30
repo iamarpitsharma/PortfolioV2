@@ -212,7 +212,12 @@ export default function Portfolio() {
     setMobileMenuOpen(false);
     const element = document.getElementById(targetId);
     if (element) {
-      if (lenis) {
+      const isDesktop =
+        typeof window !== "undefined" &&
+        window.innerWidth >= 768 &&
+        window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+
+      if (lenis && isDesktop) {
         lenis.scrollTo(element, {
           offset: -85,
           duration: 1.2,
@@ -221,7 +226,8 @@ export default function Portfolio() {
       } else {
         const topOffset = 85;
         const elementPosition = element.getBoundingClientRect().top;
-        const offsetPosition = elementPosition + window.pageYOffset - topOffset;
+        const offsetPosition =
+          elementPosition + (window.scrollY || window.pageYOffset) - topOffset;
         window.scrollTo({
           top: offsetPosition,
           behavior: "smooth",
@@ -232,7 +238,12 @@ export default function Portfolio() {
   };
 
   const scrollToTop = () => {
-    if (lenis) {
+    const isDesktop =
+      typeof window !== "undefined" &&
+      window.innerWidth >= 768 &&
+      window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+
+    if (lenis && isDesktop) {
       lenis.scrollTo(0, {
         duration: 1.2,
         easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),

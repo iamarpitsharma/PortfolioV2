@@ -3,7 +3,14 @@
 /* Manual class-based dark mode for Tailwind v4 */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Lenis smooth scrolling rules */
+/* Smooth scrolling rules:
+   - Mobile: Native CSS smooth scrolling (scroll-behavior: smooth) with 100% natural touch inertia and momentum flings.
+   - Desktop: Lenis handles silk-smooth RAF interpolation; native scroll-behavior is set to auto on .lenis to prevent engine collision.
+*/
+html {
+  scroll-behavior: smooth;
+}
+
 html.lenis,
 html.lenis body {
   height: auto;
@@ -11,7 +18,6 @@ html.lenis body {
 
 html.lenis {
   scroll-behavior: auto !important;
-  overscroll-behavior-y: none;
 }
 
 /* Optimized smooth theme transition */
